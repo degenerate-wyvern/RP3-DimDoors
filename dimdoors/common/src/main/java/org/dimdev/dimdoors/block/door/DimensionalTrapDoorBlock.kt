@@ -26,6 +26,8 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.shapes.Shapes
 import net.minecraft.world.phys.shapes.VoxelShape
 import org.dimdev.dimdoors.DimensionalDoors.Companion.getDimensionalDoorBlockRegistrar
+import org.dimdev.dimdoors.api.event.RiftChangeReason
+import org.dimdev.dimdoors.api.event.RiftToggleCallback
 import org.dimdev.dimdoors.api.util.horizontalFacing
 import org.dimdev.dimdoors.api.util.math.eulerAngle
 import org.dimdev.dimdoors.api.util.math.inverseRotateLocal
@@ -56,8 +58,8 @@ abstract class DimensionalTrapDoorBlock<T : EntranceRiftBlockEntity<T>>(
         player: Player,
         hitResult: BlockHitResult
     ): InteractionResult {
+        if (!RiftToggleCallback.EVENT.invoker().onToggle(world, pos, state, !state.getValue(OPEN), player, RiftChangeReason.DOOR_TOGGLE)) return InteractionResult.FAIL
         var state = state
-        state = state.cycle(OPEN)
         world.setBlock(pos, state, 10)
         if (!world.isClientSide && state.getValue(WATERLOGGED)) {
             world.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world))

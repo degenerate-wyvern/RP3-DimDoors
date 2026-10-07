@@ -1,14 +1,19 @@
 package org.dimdev.dimdoors
 
+import net.minecraft.core.BlockPos
 import net.minecraft.core.Holder
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.tags.TagKey
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.inventory.RecipeBookType
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.enchantment.Enchantment
 import net.minecraft.world.level.GameRules
+import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.chunk.LevelChunk
 import net.minecraft.world.level.material.FlowingFluid
 import net.minecraft.world.level.material.Fluid
@@ -23,6 +28,17 @@ import net.neoforged.neoforge.fluids.FluidType
 import org.dimdev.dimcore.NeoForgeSided
 import org.dimdev.dimcore.api.ext.castOrNull
 import org.dimdev.dimdoors.api.event.ChunkServedCallback
+import org.dimdev.dimdoors.api.event.RiftChangeReason
+import org.dimdev.dimdoors.api.event.RiftRegistrationCallback
+import org.dimdev.dimdoors.api.event.RiftToggleCallback
+import org.dimdev.dimdoors.api.event.RiftTraversalCallback
+import org.dimdev.dimdoors.block.entity.Rift
+import org.dimdev.dimdoors.event.RiftCloseEvent
+import org.dimdev.dimdoors.event.RiftEntranceEvent
+import org.dimdev.dimdoors.event.RiftExitEvent
+import org.dimdev.dimdoors.event.RiftOpenEvent
+import org.dimdev.dimdoors.event.RiftRegisterEvent
+import org.dimdev.dimdoors.event.RiftUnregisterEvent
 import org.dimdev.dimdoors.fluid.EternalFluid
 import org.dimdev.dimdoors.fluid.LeakFluid
 import org.dimdev.dimdoors.fluid.ModFluidTypes
@@ -41,6 +57,30 @@ class DimensionalDoorsNeoForge(bus: IEventBus) : NeoForgeSided<DimensionalDoorsN
             val chunk = load.chunk.castOrNull<LevelChunk>() ?: return@addListener
             ChunkServedCallback.EVENT.invoker().onChunkServed(level, chunk)
         }
+
+        RiftToggleCallback.EVENT.register(object : RiftToggleCallback {
+            override fun onToggle(level: Level, pos: BlockPos, state: BlockState, opening: Boolean, player: Player?, reason: RiftChangeReason): Boolean {
+                val event = if (opening) RiftOpenEvent(level, pos, state, player, reason) else RiftCloseEvent(level, pos, state, player, reason)
+                return !NeoForge.EVENT_BUS.post(event).isCanceled
+            }
+        })
+
+        RiftRegistrationCallback.EVENT.register(object : RiftRegistrationCallback {
+            override fun onRegistration(rift: Rift, registering: Boolean): Boolean {
+                val event = if (registering) RiftRegisterEvent(rift) else RiftUnregisterEvent(rift)
+                return !NeoForge.EVENT_BUS.post(event).isCanceled
+            }
+        })
+
+        RiftTraversalCallback.EVENT.register(object : RiftTraversalCallback {
+            override fun onEntrance(entity: Entity, rift: Rift) {
+                NeoForge.EVENT_BUS.post(RiftEntranceEvent(entity, rift))
+            }
+
+            override fun onExit(entity: Entity, level: ServerLevel, pos: BlockPos) {
+                NeoForge.EVENT_BUS.post(RiftExitEvent(entity, level, pos))
+            }
+        })
     }
 
     override fun createFlowingEternalFluid(): Fluid {

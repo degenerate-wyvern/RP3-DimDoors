@@ -16,6 +16,7 @@ import org.dimdev.dimcore.api.ext.castOrNull
 import org.dimdev.dimcore.api.util.EntityUtils.chat
 import org.dimdev.dimdoors.DimensionalDoors
 import org.dimdev.dimdoors.DimensionalDoors.Companion.config
+import org.dimdev.dimdoors.api.event.RiftTraversalCallback
 import org.dimdev.dimdoors.api.rift.target.EntityTarget
 import org.dimdev.dimdoors.api.util.Location
 import org.dimdev.dimdoors.api.util.Location.Companion.ofWorld
@@ -123,14 +124,15 @@ open class EntranceRiftBlockEntity<T : EntranceRiftBlockEntity<T>> protected con
         }
     }
 
-    override fun unregister() {
-        super.unregister()
+    override fun unregister(): Boolean {
+        if (!super.unregister()) return false
 
-        val level = level ?: return
+        val level = level ?: return true
         val pos = this.blockPos
 
         val state = level.getBlockState(pos)
         state.block.castOrNull<TraversableRiftBlock<*>>()?.closeRift(level, pos, state)
+        return true
     }
 
     fun hasTraversed(level: Level?, previousPosition: Vec3, currentPosition: Vec3): Boolean {
@@ -177,6 +179,8 @@ open class EntranceRiftBlockEntity<T : EntranceRiftBlockEntity<T>> protected con
                     relativeAngle = block.rotateTo(rotatorBuilder, sourceFrame.angle)
                     relativeVelocity = block.rotateTo(rotatorBuilder, sourceFrame.velocity)
                 }
+
+                RiftTraversalCallback.EVENT.invoker().onEntrance(entity, rift)
 
                 val owner = rift.location.riftOrPlaceholder().rift()
                 val entityTarget = target.`as`(Targets.ENTITY, owner)
@@ -253,7 +257,8 @@ open class EntranceRiftBlockEntity<T : EntranceRiftBlockEntity<T>> protected con
                 relativeVelocity
             )
 
-            TeleportUtil.teleport(entity, level, frame.pos, frame.angle, frame.velocity)
+            val teleported = TeleportUtil.teleport(entity, level, frame.pos, frame.angle, frame.velocity)
+            RiftTraversalCallback.EVENT.invoker().onExit(teleported, level, blockPos)
             return true
         }
 

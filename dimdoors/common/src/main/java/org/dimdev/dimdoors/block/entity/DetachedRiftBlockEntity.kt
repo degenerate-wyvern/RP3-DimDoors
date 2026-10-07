@@ -18,6 +18,9 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.dimdev.dimdoors.DimensionalDoors.Companion.config
+import org.dimdev.dimdoors.api.event.RiftChangeReason
+import org.dimdev.dimdoors.api.event.RiftToggleCallback
+import org.dimdev.dimdoors.api.event.RiftTraversalCallback
 import org.dimdev.dimdoors.api.rift.target.EntityTarget
 import org.dimdev.dimdoors.api.util.Location
 import org.dimdev.dimdoors.api.util.TeleportUtil
@@ -130,9 +133,10 @@ class DetachedRiftBlockEntity(pos: BlockPos, state: BlockState) : RiftBlockEntit
 
     override val isDetached: Boolean get() = true
 
-    override fun unregister() {
-        super.unregister()
+    override fun unregister(): Boolean {
+        if (!super.unregister()) return false
         level?.removeBlock(blockPos, false)
+        return true
     }
 
     override fun receiveEntity(
@@ -149,7 +153,8 @@ class DetachedRiftBlockEntity(pos: BlockPos, state: BlockState) : RiftBlockEntit
             val frame =
                 LevelSpaceHelper.INSTANCE.projectTeleportFrame(level as ServerLevel, location, localTargetPos, relativeAngle, relativeVelocity)
 
-            TeleportUtil.teleport(entity, this.level as ServerLevel, frame.pos, frame.angle, frame.velocity)
+            val teleported = TeleportUtil.teleport(entity, this.level as ServerLevel, frame.pos, frame.angle, frame.velocity)
+            RiftTraversalCallback.EVENT.invoker().onExit(teleported, this.level as ServerLevel, this.worldPosition)
         }
         return true
     }
@@ -162,10 +167,11 @@ class DetachedRiftBlockEntity(pos: BlockPos, state: BlockState) : RiftBlockEntit
                 if (level.random.nextInt(0, 100) <= absoluteChance) {
                     val sizeChange = if (weight > 0) 1 else -1
 
-                    data.size += sizeChange
+                    data.size = (data.size + sizeChange).coerceAtLeast(0)
                 }
 
                 if (weight < 0 && data.size == 0) {
+                    if (!RiftToggleCallback.EVENT.invoker().onToggle(level, pos, blockState, false, null, RiftChangeReason.DECAY)) return
                     unregister()
                     return
                 }

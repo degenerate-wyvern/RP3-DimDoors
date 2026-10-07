@@ -29,6 +29,8 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.shapes.Shapes
 import net.minecraft.world.phys.shapes.VoxelShape
 import org.dimdev.dimdoors.DimensionalDoors.Companion.getDimensionalDoorBlockRegistrar
+import org.dimdev.dimdoors.api.event.RiftChangeReason
+import org.dimdev.dimdoors.api.event.RiftToggleCallback
 import org.dimdev.dimdoors.api.util.horizontalFacing
 import org.dimdev.dimdoors.api.util.math.*
 import org.dimdev.dimdoors.block.DimensionalPortalBlock.Companion.checkType
@@ -69,6 +71,7 @@ abstract class DimensionalDoorBlock<T : EntranceRiftBlockEntity<*>>(
         player: Player,
         hitResult: BlockHitResult
     ): InteractionResult {
+        if (!RiftToggleCallback.EVENT.invoker().onToggle(world, pos, state, !state.getValue(OPEN), player, RiftChangeReason.DOOR_TOGGLE)) return InteractionResult.FAIL
         val state = state.cycle(OPEN)
         world.setBlock(pos, state, 10)
         if (!world.isClientSide && state.getValue(WATERLOGGED)) world.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world))

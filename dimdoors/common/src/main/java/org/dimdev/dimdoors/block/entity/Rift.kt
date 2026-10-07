@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 import org.dimdev.dimdoors.DimensionalDoors
+import org.dimdev.dimdoors.api.event.RiftRegistrationCallback
 import org.dimdev.dimdoors.api.rift.target.Target
 import org.dimdev.dimdoors.api.util.Location
 import org.dimdev.dimdoors.api.util.RGBA
@@ -99,6 +100,8 @@ interface Rift : Target {
             return
         }
 
+        if (!RiftRegistrationCallback.EVENT.invoker().onRegistration(this, true)) return
+
         val data = this.data
 
         RiftRegistry.instance.addRift(location)
@@ -110,10 +113,17 @@ interface Rift : Target {
         this.updateColor()
     }
 
-    fun unregister() {
-        if (this.isDeleteRift && this.isRegistered) {
+    /**
+     * @return false if the unregistration was cancelled by a listener
+     */
+    fun unregister(): Boolean {
+        if (!this.isRegistered) return true
+        if (!RiftRegistrationCallback.EVENT.invoker().onRegistration(this, false)) return false
+
+        if (this.isDeleteRift) {
             RiftRegistry.instance.removeRift(location)
         }
+        return true
     }
 
     fun updateType() {
